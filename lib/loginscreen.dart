@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:letsmakan/registerscreen.dart';
 import 'package:toast/toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:letsmakan/user.dart';
+import 'package:progress_dialog/progress_dialog.dart';
+import 'package:http/http.dart' as http;
+import 'package:letsmakan/mainscreen.dart';
+import 'package:flutter/services.dart';
 
 void main() => runApp(LoginScreen());
 bool rememberMe = false;
@@ -31,11 +36,13 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     print("Hello i'm in INITSTATE");
-    loadPref();
+    this.loadPref();
   }
 
   Widget build(BuildContext context) {
-    return new Scaffold(
+    return WillPopScope(
+      onWillPop: _onBackPressed,
+    child: Scaffold(
       resizeToAvoidBottomPadding: false,
       backgroundColor: Colors.purple[200],
       body: new Container(
@@ -63,6 +70,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     height: 2,
                   ),
                   TextField(
+                     controller: _emailEditingController,
+                      keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
                     labelText: 'Email',
                     icon: Icon(
@@ -72,6 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     border: OutlineInputBorder(),
                   )),
                   TextField(
+                    controller: _passEditingController,
                     decoration: InputDecoration(
                       labelText: 'Password',
                       icon: Icon(Icons.lock, color: Colors.purple[200]),
@@ -100,10 +110,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         minWidth: 90,
                         height: 40,
                         child: Text('Login'),
-                        color: Colors.brown,
+                        color: Colors.purple [200],
                         textColor: Colors.white,
                         elevation: 10,
-                        onPressed: _userLogin,
+                        onPressed: this._userLogin,
                       ),
                     ],
                   ),
@@ -116,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text("Don't have any account ? ",
                           style: TextStyle(fontSize: 16.0)),
                       FlatButton(
-                        onPressed: registerUser,
+                        onPressed: _registerUser,
                         child: Text(" CREATE ACCOUNT ",
                             style: TextStyle(
                                 fontSize: 16.0, fontWeight: FontWeight.bold)),
@@ -129,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text("Forget Password ? ",
                           style: TextStyle(fontSize: 16.0)),
                       FlatButton(
-                        onPressed: null,
+                        onPressed: _forgotPassword,
                         child: Text(" Reset Password ",
                             style: TextStyle(
                                 fontSize: 16.0, fontWeight: FontWeight.bold)),
@@ -142,17 +152,128 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
-  void _userLogin() {
+  void _userLogin()  async {
+    try {
+      ProgressDialog pr = new ProgressDialog(context,
+          type: ProgressDialogType.Normal, isDismissible: false);
+      pr.style(message: "Log in...");
+      pr.show();
+      String _email = _emailEditingController.text;
+      String _password = _passEditingController.text;
+      http.post(urlLogin, body: {
+        "email": _email,
+        "password": _password,
+      })
+          //.timeout(const Duration(seconds: 4))
+          .then((res) {
+        print(res.body);
+        var string = res.body;
+        List userdata = string.split(",");
+        if (userdata[0] == "success") {
+          User _user = new User(
+              name: userdata[1],
+              email: _email,
+              password: _password,
+              phone: userdata[3],
+              credit: userdata[4],
+              datereg: userdata[5],
+              quantity: userdata[4]);
+          pr.dismiss();
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (BuildContext context) => MainScreen(
+                        user: _user,
+                      )));
+                      Toast.show("Login successful", context,
+            duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
+        } else {
+          pr.dismiss();
+          Toast.show("Login failed", context,
+              duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
+        }
+      }).catchError((err) {
+        print(err);
+        pr.dismiss();
+      });
+    } on Exception catch (_) {
+      Toast.show("Error", context,
+          duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
+    }
   }
 
-  void registerUser() {
+
+  void _registerUser() {
     Navigator.push(context,
         MaterialPageRoute(builder: (BuildContext context) => RegisterScreen()));
   }
-
+void _forgotPassword() {
+    TextEditingController phoneController = TextEditingController();
+    // flutter defined function
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        // return object of type Dialog
+        return AlertDialog(
+          title: new Text(
+            "Forgot Password?",
+            style: TextStyle(
+              color: Colors.white,
+            ),
+          ),
+          content: new Container(
+            height: 100,
+            child: Column(
+              children: <Widget>[
+                Text(
+                  "Enter your recovery email",
+                  style: TextStyle(
+                    color: Colors.white,
+                  ),
+                ),
+                TextField(
+                    decoration: InputDecoration(
+                  labelText: 'Email',
+                  icon: Icon(Icons.email),
+                ))
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            // usually buttons at the bottom of the dialog
+            new FlatButton(
+              child: new Text(
+                "Yes",
+                style: TextStyle(
+                  color: Color.fromRGBO(101, 255, 218, 50),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+                print(
+                  phoneController.text,
+                );
+              },
+            ),
+            new FlatButton(
+              child: new Text(
+                "No",
+                style: TextStyle(
+                  color: Color.fromRGBO(101, 255, 218, 50),
+                ),
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
   void _onRememberMeChanged(bool newValue) => setState(() {
         rememberMe = newValue;
         print(rememberMe);
@@ -162,6 +283,51 @@ class _LoginScreenState extends State<LoginScreen> {
           savepref(false);
         }
       });
+
+Future<bool> _onBackPressed() {
+    return showDialog(
+          context: context,
+          builder: (context) => new AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(20.0))),
+            title: new Text(
+              'Are you sure?',
+              style: TextStyle(
+                color: Colors.white,
+              ),
+            ),
+            content: new Text(
+              'Do you want to exit an App',
+              style: TextStyle(
+                color: Colors.white,
+              ),
+            ),
+            actions: <Widget>[
+              MaterialButton(
+                  onPressed: () {
+                    SystemChannels.platform.invokeMethod('SystemNavigator.pop');
+                  },
+                  child: Text(
+                    "Exit",
+                    style: TextStyle(
+                      color: Color.fromRGBO(101, 255, 218, 50),
+                    ),
+                  )),
+              MaterialButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(false);
+                  },
+                  child: Text(
+                    "Cancel",
+                    style: TextStyle(
+                      color: Color.fromRGBO(101, 255, 218, 50),
+                    ),
+                  )),
+            ],
+          ),
+        ) ??
+        false;
+  }
 
   void loadPref() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -200,3 +366,5 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 }
+
+

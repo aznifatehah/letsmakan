@@ -207,12 +207,12 @@ void _userConfirmation() {
       "password": password,
     }).then((res) {
       if (res.body == "success") {
+        Toast.show("Registration success", context,
+            duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
         Navigator.pop(
             context,
             MaterialPageRoute(
                 builder: (BuildContext context) => LoginScreen()));
-        Toast.show("Registration success", context,
-            duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
       } else {
         Toast.show("Registration failed", context,
             duration: Toast.LENGTH_LONG, gravity: Toast.BOTTOM);
